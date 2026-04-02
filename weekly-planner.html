@@ -211,6 +211,7 @@ function driveLogin(){
   const client = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
+    ux_mode: 'popup',
     callback: async (resp) => {
       if(resp.error){ setDriveStatus('error','로그인 실패: '+resp.error); return; }
       accessToken = resp.access_token;
@@ -219,10 +220,10 @@ function driveLogin(){
       document.getElementById('driveSyncBtn').style.display='';
       document.getElementById('driveLogoutBtn').style.display='';
       setDriveStatus('syncing','Drive 연결됨 — 데이터 불러오는 중…');
-      await drivePull(); // load from drive first
+      await drivePull();
     }
   });
-  client.requestAccessToken();
+  client.requestAccessToken({prompt:'consent'});
 }
 
 function driveLogout(){
