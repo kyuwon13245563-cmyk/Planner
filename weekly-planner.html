@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weekly Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root {
+  --ink: #1a1a1a; --bg: #f7f5f1; --white: #fff;
+  --mid: #ece9e2; --soft: #d4cfc5; --line: #dedad2; --accent: #8b6f47;
+  --hour-h: 26px; --label-w: 22px; --memo-line-h: 30px;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; padding:16px 20px 60px; -webkit-font-smoothing:antialiased; }
+
+/* TOOLBAR */
+.toolbar { display:flex; justify-content:space-between; align-items:center; max-width:1440px; margin:0 auto 10px; flex-wrap:wrap; gap:8px; }
+.toolbar-title { font-family:'DM Serif Display',serif; font-size:22px; color:var(--accent); font-style:italic; }
+.week-nav { display:flex; align-items:center; gap:12px; }
+.nav-btn { background:none; border:none; cursor:pointer; color:var(--accent); font-size:22px; padding:0 6px; }
+.nav-btn:hover { color:var(--ink); }
+.week-label { font-family:'DM Serif Display',serif; font-size:14px; color:var(--ink); min-width:140px; text-align:center; }
+.toolbar-btns { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.btn { padding:7px 18px; font-family:'DM Sans',sans-serif; font-size:11px; letter-spacing:0.05em; cursor:pointer; border-radius:2px; transition:all 0.15s; }
+.btn-outline { background:transparent; border:1px solid var(--soft); color:var(--ink); }
+.btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+.btn-primary { background:var(--accent); border:1px solid var(--accent); color:#fff; }
+.btn-primary:hover { background:#7a5f3a; }
+.btn-drive { background:#4285f4; border:1px solid #4285f4; color:#fff; display:flex; align-items:center; gap:6px; }
+.btn-drive:hover { background:#3367d6; border-color:#3367d6; }
+.btn-drive svg { width:14px; height:14px; flex-shrink:0; }
+.btn-drive-out { background:transparent; border:1px solid #4285f4; color:#4285f4; display:flex; align-items:center; gap:5px; }
+.btn-drive-out:hover { background:#e8f0fe; }
+
+/* drive status bar */
+.drive-bar {
+  max-width:1440px; margin:0 auto 8px;
+  display:flex; align-items:center; gap:10px;
+  font-size:11px; color:var(--soft);
+  min-height:20px;
+}
+.drive-dot { width:7px; height:7px; border-radius:50%; background:var(--soft); flex-shrink:0; }
+.drive-dot.connected { background:#34a853; }
+.drive-dot.syncing { background:#fbbc04; animation:pulse 1s infinite; }
+.drive-dot.error { background:#ea4335; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* PALETTE */
+.palette-bar { display:flex; align-items:center; gap:7px; max-width:1440px; margin:0 auto 10px; flex-wrap:wrap; }
+.palette-label { font-size:10px; letter-spacing:0.08em; color:var(--soft); text-transform:uppercase; margin-right:4px; }
+.swatch { width:20px; height:20px; border-radius:50%; cursor:pointer; border:2.5px solid transparent; transition:transform 0.12s, border-color 0.12s; flex-shrink:0; }
+.swatch:hover { transform:scale(1.2); }
+.swatch.active { border-color:var(--ink); transform:scale(1.15); }
+.swatch-clear { width:20px; height:20px; border-radius:50%; cursor:pointer; border:1.5px solid var(--soft); background:white; font-size:11px; line-height:17px; text-align:center; color:var(--soft); flex-shrink:0; }
+.swatch-clear:hover { border-color:var(--ink); color:var(--ink); }
+.palette-hint { font-size:10px; color:var(--soft); margin-left:8px; font-style:italic; }
+
+/* PLANNER */
+.planner-wrap { max-width:1440px; margin:0 auto; background:var(--white); border:1px solid var(--line); border-radius:2px; overflow:hidden; box-shadow:0 3px 24px rgba(0,0,0,0.07); }
+
+/* TOP BAR */
+.top-bar { display:flex; align-items:stretch; border-bottom:1px solid var(--line); min-height:46px; }
+.goal-section { display:flex; align-items:center; flex:1; padding:0 16px; gap:12px; border-right:1px solid var(--line); }
+.goal-label { font-family:'DM Serif Display',serif; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--accent); white-space:nowrap; }
+.goal-input { flex:1; border:none; outline:none; background:transparent; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--ink); }
+.review-section { display:flex; align-items:center; padding:0 20px; gap:10px; }
+.review-label { font-family:'DM Serif Display',serif; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--accent); white-space:nowrap; }
+.stars { display:flex; gap:3px; }
+.star { font-size:19px; cursor:pointer; color:var(--soft); transition:color 0.12s; user-select:none; line-height:1; }
+.star.filled { color:var(--accent); }
+
+/* DAY HEADERS */
+.day-headers { display:grid; grid-template-columns:repeat(7,1fr); border-bottom:1px solid var(--line); }
+.day-header { padding:10px 12px 8px; border-right:1px solid var(--line); display:flex; align-items:baseline; gap:7px; }
+.day-header:last-child { border-right:none; }
+.day-date { font-size:11px; color:var(--soft); font-weight:300; }
+.day-name { font-family:'DM Serif Display',serif; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink); }
+
+/* MEMO */
+.memo-section { display:grid; grid-template-columns:repeat(7,1fr); border-bottom:2.5px solid var(--line); }
+.memo-col { border-right:1px solid var(--line); }
+.memo-col:last-child { border-right:none; }
+.memo-item { display:flex; align-items:center; border-bottom:1px solid var(--line); min-height:var(--memo-line-h); padding:0 8px; gap:7px; }
+.memo-item:last-child { border-bottom:none; }
+.memo-checkbox { width:12px; height:12px; border:1.5px solid var(--soft); border-radius:2px; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:all 0.12s; background:white; }
+.memo-checkbox.checked { background:var(--accent); border-color:var(--accent); }
+.memo-checkbox.checked::after { content:''; width:6px; height:3.5px; border-left:1.5px solid white; border-bottom:1.5px solid white; transform:rotate(-45deg) translateY(-1px); display:block; }
+.memo-text { flex:1; border:none; outline:none; background:transparent; font-family:'DM Sans',sans-serif; font-size:14px; color:var(--ink); padding:3px 0; }
+.memo-text.done { text-decoration:line-through; color:var(--soft); }
+
+/* SCHEDULE */
+.schedule-section { display:grid; grid-template-columns:repeat(7,1fr); }
+.sched-col { border-right:1px solid var(--line); position:relative; display:flex; flex-direction:column; }
+.sched-col:last-child { border-right:none; }
+.hour-row { display:flex; border-bottom:1px solid var(--line); height:var(--hour-h); flex-shrink:0; }
+.hour-row:last-child { border-bottom:none; }
+.hour-label-cell { width:var(--label-w); min-width:var(--label-w); flex-shrink:0; font-size:9px; color:var(--soft); padding:3px 0 0 3px; font-weight:300; line-height:1; pointer-events:none; border-right:1px solid var(--line); }
+.sub-cols-bg { flex:1; display:flex; }
+.sub-cell-bg { flex:1; border-right:1px dotted var(--mid); }
+.sub-cell-bg:last-child { border-right:none; }
+.drag-overlay { position:absolute; top:0; left:var(--label-w); right:0; bottom:0; z-index:2; cursor:crosshair; user-select:none; }
+.event-block { position:absolute; z-index:3; border-radius:2px; border:1px solid rgba(0,0,0,0.12); overflow:hidden; display:flex; align-items:flex-start; justify-content:center; transition:box-shadow 0.1s; }
+.event-block:hover { box-shadow:0 1px 6px rgba(0,0,0,0.18); }
+.event-label { font-family:'DM Sans',sans-serif; font-size:13px; color:var(--ink); padding:2px 4px; pointer-events:none; width:100%; overflow:hidden; white-space:pre-wrap; word-break:break-all; line-height:1.4; }
+.event-editor { width:100%; height:100%; border:none; outline:none; background:transparent; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--ink); padding:2px 4px; resize:none; cursor:text; line-height:1.4; word-break:break-all; }
+.event-delete { position:absolute; top:2px; right:3px; font-size:9px; color:rgba(0,0,0,0.4); cursor:pointer; z-index:5; display:none; background:rgba(255,255,255,0.7); border-radius:50%; width:14px; height:14px; text-align:center; line-height:14px; }
+.event-block:hover .event-delete { display:block; }
+.drag-preview { position:absolute; z-index:1; pointer-events:none; border-radius:2px; opacity:0.5; display:none; }
+
+/* BOTTOM BAR */
+.bottom-bar { display:grid; grid-template-columns:repeat(7,1fr); border-top:2.5px solid var(--line); }
+.bottom-cell { display:flex; align-items:center; justify-content:center; gap:4px; padding:9px 4px; border-right:1px solid var(--line); }
+.bottom-cell:last-child { border-right:none; }
+.hm-label { font-size:10px; letter-spacing:0.08em; color:var(--soft); font-family:'DM Serif Display',serif; }
+.hm-input { width:28px; border:none; border-bottom:1px solid var(--line); outline:none; background:transparent; font-family:'DM Sans',sans-serif; font-size:12px; color:var(--ink); text-align:center; padding:1px 0; }
+
+@media print {
+  body { background:white; padding:0; }
+  .toolbar,.palette-bar,.drive-bar { display:none; }
+  .planner-wrap { box-shadow:none; border:none; }
+  .drag-overlay,.drag-preview { display:none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="toolbar-title">Weekly Planner</div>
+  <div class="week-nav">
+    <button class="nav-btn" onclick="changeWeek(-1)">‹</button>
+    <span class="week-label" id="weekLabel"></span>
+    <button class="nav-btn" onclick="changeWeek(1)">›</button>
+  </div>
+  <div class="toolbar-btns">
+    <button class="btn btn-outline" onclick="clearAll()">초기화</button>
+    <button class="btn btn-outline" onclick="window.print()">인쇄</button>
+    <button class="btn btn-primary" onclick="saveData()">저장</button>
+    <button class="btn btn-drive" id="driveLoginBtn" onclick="driveLogin()">
+      <svg viewBox="0 0 24 24" fill="white"><path d="M6.28 3l5.72 9.9L6.28 3zm11.44 0L12 12.9 17.72 3zM1 21l4.28-7.41L9.56 21H1zm13.44 0l4.28-7.41L23 21h-8.56zM7.85 13.59L12 21l4.15-7.41H7.85z"/></svg>
+      Google Drive 연결
+    </button>
+    <button class="btn btn-drive-out" id="driveSyncBtn" onclick="driveSyncAll()" style="display:none">☁ 동기화</button>
+    <button class="btn btn-outline" id="driveLogoutBtn" onclick="driveLogout()" style="display:none">연결 해제</button>
+  </div>
+</div>
+
+<!-- Drive status -->
+<div class="drive-bar">
+  <div class="drive-dot" id="driveDot"></div>
+  <span id="driveStatus">Google Drive 미연결 — 로컬에만 저장됩니다</span>
+</div>
+
+<div class="palette-bar">
+  <span class="palette-label">색상</span>
+  <div class="swatch active" data-color="#f4c6c6" style="background:#f4c6c6"></div>
+  <div class="swatch" data-color="#fde8b4" style="background:#fde8b4"></div>
+  <div class="swatch" data-color="#c8e6c9" style="background:#c8e6c9"></div>
+  <div class="swatch" data-color="#b3d9f7" style="background:#b3d9f7"></div>
+  <div class="swatch" data-color="#d9c8f5" style="background:#d9c8f5"></div>
+  <div class="swatch" data-color="#f5d9c8" style="background:#f5d9c8"></div>
+  <div class="swatch" data-color="#d4e8e0" style="background:#d4e8e0"></div>
+  <div class="swatch" data-color="#c8d8e8" style="background:#c8d8e8"></div>
+  <div class="swatch-clear" title="지우기">✕</div>
+  <span class="palette-hint">드래그: 블록 생성 &nbsp;|&nbsp; 더블클릭: 텍스트 입력 &nbsp;|&nbsp; 호버 후 ✕: 삭제</span>
+</div>
+
+<div class="planner-wrap">
+  <div class="top-bar">
+    <div class="goal-section">
+      <span class="goal-label">My Goal</span>
+      <input class="goal-input" id="goalInput" type="text" placeholder="이번 주 목표를 입력하세요…">
+    </div>
+    <div class="review-section">
+      <span class="review-label">Review of the Week</span>
+      <div class="stars">
+        <span class="star" data-val="1">★</span>
+        <span class="star" data-val="2">★</span>
+        <span class="star" data-val="3">★</span>
+        <span class="star" data-val="4">★</span>
+        <span class="star" data-val="5">★</span>
+      </div>
+    </div>
+  </div>
+  <div class="day-headers" id="dayHeaders"></div>
+  <div class="memo-section" id="memoSection"></div>
+  <div class="schedule-section" id="scheduleSection"></div>
+  <div class="bottom-bar" id="bottomBar"></div>
+</div>
+
+<script>
+// ── Google Drive Config ────────────────────────────────────────────────
+const CLIENT_ID = '919459994138-7kil35cbmoor2tg5m9q7ho487t9cptpg.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
+const DRIVE_FILE_NAME = 'weekly-planner-data.json';
+
+let accessToken = null;
+let driveFileId = null; // cached file ID in appDataFolder
+let syncTimer = null;
+
+// ── Drive UI helpers ───────────────────────────────────────────────────
+function setDriveStatus(state, msg){
+  const dot=document.getElementById('driveDot');
+  const txt=document.getElementById('driveStatus');
+  dot.className='drive-dot '+(state||'');
+  txt.textContent=msg;
+}
+
+function driveLogin(){
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: async (resp) => {
+      if(resp.error){ setDriveStatus('error','로그인 실패: '+resp.error); return; }
+      accessToken = resp.access_token;
+      localStorage.setItem('driveAccessToken', accessToken);
+      document.getElementById('driveLoginBtn').style.display='none';
+      document.getElementById('driveSyncBtn').style.display='';
+      document.getElementById('driveLogoutBtn').style.display='';
+      setDriveStatus('syncing','Drive 연결됨 — 데이터 불러오는 중…');
+      await drivePull(); // load from drive first
+    }
+  });
+  client.requestAccessToken();
+}
+
+function driveLogout(){
+  accessToken=null; driveFileId=null;
+  localStorage.removeItem('driveAccessToken');
+  document.getElementById('driveLoginBtn').style.display='';
+  document.getElementById('driveSyncBtn').style.display='none';
+  document.getElementById('driveLogoutBtn').style.display='none';
+  setDriveStatus('','Google Drive 미연결 — 로컬에만 저장됩니다');
+}
+
+// ── Drive API calls ────────────────────────────────────────────────────
+async function driveRequest(url, options={}){
+  if(!accessToken) return null;
+  const res = await fetch(url, {
+    ...options,
+    headers: { 'Authorization':'Bearer '+accessToken, ...(options.headers||{}) }
+  });
+  if(res.status===401){ driveLogout(); return null; }
+  return res;
+}
+
+async function findDriveFile(){
+  const res = await driveRequest(
+    `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${DRIVE_FILE_NAME}'&fields=files(id,name)`
+  );
+  if(!res) return null;
+  const data = await res.json();
+  return data.files&&data.files.length>0 ? data.files[0].id : null;
+}
+
+async function drivePull(){
+  setDriveStatus('syncing','Drive에서 불러오는 중…');
+  try {
+    driveFileId = await findDriveFile();
+    if(!driveFileId){ setDriveStatus('connected','Drive 연결됨 — 저장된 데이터 없음'); return; }
+
+    const res = await driveRequest(
+      `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`
+    );
+    if(!res){ return; }
+    const driveData = await res.json();
+
+    // Merge: overwrite localStorage with drive data
+    Object.entries(driveData).forEach(([k,v])=>{
+      localStorage.setItem(k, typeof v==='string'?v:JSON.stringify(v));
+    });
+
+    // Reload current week from updated localStorage
+    loadWeek();
+    setDriveStatus('connected',`Drive 연결됨 — ${new Date().toLocaleTimeString('ko-KR')} 불러옴`);
+  } catch(e){
+    setDriveStatus('error','Drive 불러오기 실패: '+e.message);
+  }
+}
+
+async function drivePush(){
+  if(!accessToken) return;
+  setDriveStatus('syncing','Drive에 저장 중…');
+  try {
+    // Collect all planner keys from localStorage
+    const allData = {};
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k.startsWith('plannerF_')) allData[k]=localStorage.getItem(k);
+    }
+    const body = JSON.stringify(allData);
+
+    if(!driveFileId) driveFileId = await findDriveFile();
+
+    if(driveFileId){
+      // Update existing file
+      await driveRequest(
+        `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,
+        { method:'PATCH', headers:{'Content-Type':'application/json'}, body }
+      );
+    } else {
+      // Create new file in appDataFolder
+      const meta = JSON.stringify({ name: DRIVE_FILE_NAME, parents: ['appDataFolder'] });
+      const form = new FormData();
+      form.append('metadata', new Blob([meta],{type:'application/json'}));
+      form.append('file', new Blob([body],{type:'application/json'}));
+      const res = await driveRequest(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+        { method:'POST', body:form }
+      );
+      if(res){ const d=await res.json(); driveFileId=d.id; }
+    }
+    setDriveStatus('connected',`Drive 연결됨 — ${new Date().toLocaleTimeString('ko-KR')} 저장됨`);
+  } catch(e){
+    setDriveStatus('error','Drive 저장 실패: '+e.message);
+  }
+}
+
+// Debounced auto-push after any save
+function scheduleDrivePush(){
+  if(!accessToken) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(()=>drivePush(), 1500);
+}
+
+async function driveSyncAll(){
+  await drivePull();
+  await drivePush();
+}
+
+// ── Constants ──────────────────────────────────────────────────────────
+const DAYS = ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'];
+const MEMO_LINES = 10;
+const SUB_COLS = 6;
+const HOUR_H = 26;
+const LABEL_W = 22;
+
+const SCHEDULE_HOURS = [];
+for(let h=7;h<=12;h++) SCHEDULE_HOURS.push(h);
+for(let h=1;h<=12;h++) SCHEDULE_HOURS.push(h);
+for(let h=1;h<=2;h++)  SCHEDULE_HOURS.push(h);
+const N_HOURS = SCHEDULE_HOURS.length;
+
+// ── State ──────────────────────────────────────────────────────────────
+let currentWeekStart = getMonday(new Date());
+let starRating = 0;
+let activeColor = '#f4c6c6';
+let eraseMode = false;
+let isDragging = false;
+let dragDi = -1;
+let dragStartSlot = -1;
+let dragEndSlot = -1;
+let events = [];
+
+// ── Utils ──────────────────────────────────────────────────────────────
+function getMonday(d){const date=new Date(d),day=date.getDay();date.setDate(date.getDate()-day+(day===0?-6:1));date.setHours(0,0,0,0);return date;}
+function formatDate(d){return `${d.getMonth()+1}/${d.getDate()}`;}
+function getWeekDates(m){return Array.from({length:7},(_,i)=>{const d=new Date(m);d.setDate(m.getDate()+i);return d;});}
+function getWeekKey(m){return m.toISOString().slice(0,10);}
+function initEvents(){events=Array.from({length:7},()=>[]);}
+
+function pointToSlot(overlayEl,clientX,clientY){
+  const rect=overlayEl.getBoundingClientRect();
+  const relY=Math.max(0,Math.min(rect.height-1,clientY-rect.top));
+  const relX=Math.max(0,Math.min(rect.width-1,clientX-rect.left));
+  const hi=Math.floor(relY/HOUR_H);
+  const sc=Math.floor(relX/(rect.width/SUB_COLS));
+  return Math.min(N_HOURS*SUB_COLS-1,Math.max(0,hi*SUB_COLS+sc));
+}
+
+function slotsToRect(s,e,overlayWidth){
+  const startHi=Math.floor(s/SUB_COLS),startSc=s%SUB_COLS;
+  const endHi=Math.floor(e/SUB_COLS),endSc=e%SUB_COLS;
+  const colW=overlayWidth/SUB_COLS;
+  return {left:LABEL_W+startSc*colW,top:startHi*HOUR_H,width:(endSc-startSc+1)*colW,height:(endHi-startHi+1)*HOUR_H};
+}
+
+function getOverlayWidth(di){
+  const ov=document.getElementById(`overlay_${di}`);
+  if(ov){const r=ov.getBoundingClientRect();if(r.width>0)return r.width;}
+  const col=document.getElementById(`sched_${di}`);
+  return col?col.getBoundingClientRect().width-LABEL_W:100;
+}
+
+// ── Render ─────────────────────────────────────────────────────────────
+function renderHeaders(dates){
+  const c=document.getElementById('dayHeaders');c.innerHTML='';
+  DAYS.forEach((day,i)=>{
+    const div=document.createElement('div');div.className='day-header';
+    div.innerHTML=`<span class="day-date">${formatDate(dates[i])}</span><span class="day-name">${day}</span>`;
+    c.appendChild(div);
+  });
+}
+
+function renderMemo(){
+  const c=document.getElementById('memoSection');c.innerHTML='';
+  DAYS.forEach((_,di)=>{
+    const col=document.createElement('div');col.className='memo-col';
+    for(let li=0;li<MEMO_LINES;li++){
+      const item=document.createElement('div');item.className='memo-item';
+      const cb=document.createElement('div');cb.className='memo-checkbox';cb.id=`cb_${di}_${li}`;
+      cb.addEventListener('click',()=>toggleCheck(di,li));
+      const inp=document.createElement('input');inp.type='text';inp.className='memo-text';inp.id=`mt_${di}_${li}`;
+      inp.addEventListener('change',saveData);
+      item.appendChild(cb);item.appendChild(inp);col.appendChild(item);
+    }
+    c.appendChild(col);
+  });
+}
+function toggleCheck(di,li){
+  const cb=document.getElementById(`cb_${di}_${li}`);
+  const inp=document.getElementById(`mt_${di}_${li}`);
+  cb.classList.toggle('checked');
+  inp.classList.toggle('done',cb.classList.contains('checked'));
+  saveData();
+}
+
+function renderSchedule(){
+  const c=document.getElementById('scheduleSection');c.innerHTML='';
+  DAYS.forEach((_,di)=>{
+    const col=document.createElement('div');col.className='sched-col';col.id=`sched_${di}`;
+    SCHEDULE_HOURS.forEach(hr=>{
+      const row=document.createElement('div');row.className='hour-row';
+      const lbl=document.createElement('div');lbl.className='hour-label-cell';lbl.textContent=hr;
+      const bg=document.createElement('div');bg.className='sub-cols-bg';
+      for(let sc=0;sc<SUB_COLS;sc++){const cell=document.createElement('div');cell.className='sub-cell-bg';bg.appendChild(cell);}
+      row.appendChild(lbl);row.appendChild(bg);col.appendChild(row);
+    });
+    const overlay=document.createElement('div');overlay.className='drag-overlay';overlay.id=`overlay_${di}`;
+    overlay.addEventListener('mousedown',e=>{
+      if(e.target.classList.contains('event-delete')||e.target.classList.contains('event-label')||e.target.classList.contains('event-editor')) return;
+      e.preventDefault();
+      isDragging=true;dragDi=di;
+      dragStartSlot=pointToSlot(overlay,e.clientX,e.clientY);
+      dragEndSlot=dragStartSlot;
+      updatePreview(di,overlay);
+    });
+    overlay.addEventListener('mousemove',e=>{
+      if(!isDragging||dragDi!==di) return;
+      dragEndSlot=pointToSlot(overlay,e.clientX,e.clientY);
+      updatePreview(di,overlay);
+    });
+    overlay.addEventListener('dblclick',e=>{
+      const slot=pointToSlot(overlay,e.clientX,e.clientY);
+      const ev=getEventAtSlot(di,slot);
+      if(ev) openEditor(di,ev);
+    });
+    col.appendChild(overlay);
+    const preview=document.createElement('div');preview.className='drag-preview';preview.id=`preview_${di}`;
+    col.appendChild(preview);
+    c.appendChild(col);
+  });
+  renderAllEvents();
+}
+
+function updatePreview(di,overlayEl){
+  const preview=document.getElementById(`preview_${di}`);
+  if(!preview) return;
+  if(!isDragging||eraseMode||!activeColor){preview.style.display='none';return;}
+  const ow=overlayEl.getBoundingClientRect().width;
+  const s=Math.min(dragStartSlot,dragEndSlot),e=Math.max(dragStartSlot,dragEndSlot);
+  const r=slotsToRect(s,e,ow);
+  Object.assign(preview.style,{display:'block',left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px',background:activeColor});
+}
+
+function commitDrag(){
+  if(!isDragging) return;
+  isDragging=false;
+  const di=dragDi;
+  const preview=document.getElementById(`preview_${di}`);
+  if(preview) preview.style.display='none';
+  const s=Math.min(dragStartSlot,dragEndSlot),e=Math.max(dragStartSlot,dragEndSlot);
+  if(eraseMode||!activeColor){
+    events[di]=events[di].filter(ev=>ev.endSlot<s||ev.startSlot>e);
+  } else {
+    events[di]=events[di].filter(ev=>ev.endSlot<s||ev.startSlot>e);
+    events[di].push({startSlot:s,endSlot:e,color:activeColor,text:''});
+  }
+  renderEventsForDay(di);saveData();
+}
+
+function renderAllEvents(){DAYS.forEach((_,di)=>renderEventsForDay(di));}
+
+function renderEventsForDay(di){
+  const col=document.getElementById(`sched_${di}`);if(!col) return;
+  col.querySelectorAll('.event-block').forEach(el=>el.remove());
+  const ow=getOverlayWidth(di);
+  (events[di]||[]).forEach(ev=>{
+    const s=Math.min(ev.startSlot,ev.endSlot),e=Math.max(ev.startSlot,ev.endSlot);
+    const r=slotsToRect(s,e,ow);
+    const block=document.createElement('div');block.className='event-block';
+    Object.assign(block.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px',background:ev.color});
+    const lbl=document.createElement('div');lbl.className='event-label';lbl.textContent=ev.text||'';
+    block.appendChild(lbl);
+    const del=document.createElement('span');del.className='event-delete';del.textContent='✕';
+    del.addEventListener('click',e2=>{e2.stopPropagation();events[di]=events[di].filter(x=>x!==ev);renderEventsForDay(di);saveData();});
+    block.appendChild(del);
+    block.addEventListener('dblclick',e2=>{e2.stopPropagation();openEditorOnBlock(ev,block,lbl);});
+    col.appendChild(block);
+  });
+}
+
+function getEventAtSlot(di,slot){
+  return (events[di]||[]).find(ev=>{const s=Math.min(ev.startSlot,ev.endSlot),e=Math.max(ev.startSlot,ev.endSlot);return slot>=s&&slot<=e;})||null;
+}
+
+function openEditor(di,ev){
+  const col=document.getElementById(`sched_${di}`);if(!col) return;
+  const ow=getOverlayWidth(di);
+  const s=Math.min(ev.startSlot,ev.endSlot),e=Math.max(ev.startSlot,ev.endSlot);
+  const r=slotsToRect(s,e,ow);
+  let target=null;
+  col.querySelectorAll('.event-block').forEach(bl=>{if(Math.abs(parseFloat(bl.style.left)-r.left)<2&&Math.abs(parseFloat(bl.style.top)-r.top)<2)target=bl;});
+  if(!target) return;
+  const lbl=target.querySelector('.event-label');
+  if(lbl) openEditorOnBlock(ev,target,lbl);
+}
+
+function openEditorOnBlock(ev,block,lbl){
+  if(block.querySelector('.event-editor')) return;
+  const ta=document.createElement('textarea');ta.className='event-editor';ta.value=ev.text||'';
+  lbl.replaceWith(ta);ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
+  const finish=()=>{
+    if(!block.querySelector('.event-editor')) return;
+    ev.text=ta.value;
+    const newLbl=document.createElement('div');newLbl.className='event-label';newLbl.textContent=ev.text;
+    ta.replaceWith(newLbl);
+    block.addEventListener('dblclick',e2=>{e2.stopPropagation();openEditorOnBlock(ev,block,newLbl);},{once:true});
+    saveData();
+  };
+  ta.addEventListener('blur',finish);
+  ta.addEventListener('keydown',e=>{if(e.key==='Escape'){ta.value=ev.text||'';finish();}});
+}
+
+function renderBottom(){
+  const c=document.getElementById('bottomBar');c.innerHTML='';
+  DAYS.forEach((_,i)=>{
+    const div=document.createElement('div');div.className='bottom-cell';
+    div.innerHTML=`<input class="hm-input" id="h_${i}" type="text" placeholder="0" maxlength="3"><span class="hm-label">H</span><input class="hm-input" id="m_${i}" type="text" placeholder="0" maxlength="2"><span class="hm-label">M</span>`;
+    c.appendChild(div);
+  });
+}
+
+function initStars(){
+  const stars=document.querySelectorAll('.star');
+  stars.forEach(star=>{
+    star.addEventListener('click',()=>{starRating=parseInt(star.dataset.val);updateStars();saveData();});
+    star.addEventListener('mouseover',()=>{const v=parseInt(star.dataset.val);stars.forEach(s=>s.style.color=parseInt(s.dataset.val)<=v?'var(--accent)':'var(--soft)');});
+    star.addEventListener('mouseout',()=>{stars.forEach(s=>s.style.color='');updateStars();});
+  });
+}
+function updateStars(){document.querySelectorAll('.star').forEach(s=>s.classList.toggle('filled',parseInt(s.dataset.val)<=starRating));}
+
+function initPalette(){
+  document.querySelectorAll('.swatch').forEach(sw=>{
+    sw.addEventListener('click',()=>{document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));sw.classList.add('active');activeColor=sw.dataset.color;eraseMode=false;});
+  });
+  document.querySelector('.swatch-clear').addEventListener('click',()=>{
+    document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
+    document.querySelector('.swatch-clear').style.borderColor='var(--ink)';
+    eraseMode=true;activeColor='';
+  });
+}
+
+// ── Save / Load ────────────────────────────────────────────────────────
+function saveData(){
+  const key=getWeekKey(currentWeekStart);
+  const memos=DAYS.map((_,di)=>Array.from({length:MEMO_LINES},(_,li)=>({
+    text:document.getElementById(`mt_${di}_${li}`)?.value||'',
+    checked:document.getElementById(`cb_${di}_${li}`)?.classList.contains('checked')||false
+  })));
+  const hm=DAYS.map((_,i)=>({h:document.getElementById(`h_${i}`)?.value||'',m:document.getElementById(`m_${i}`)?.value||''}));
+  localStorage.setItem('plannerF_'+key,JSON.stringify({
+    goal:document.getElementById('goalInput').value,
+    stars:starRating,memos,hm,events
+  }));
+  scheduleDrivePush(); // auto-push to Drive if connected
+}
+
+function loadWeek(){
+  const dates=getWeekDates(currentWeekStart);
+  updateWeekLabel();initEvents();
+  renderHeaders(dates);renderMemo();renderSchedule();renderBottom();
+  const raw=localStorage.getItem('plannerF_'+getWeekKey(currentWeekStart));
+  if(!raw){document.getElementById('goalInput').value='';starRating=0;updateStars();return;}
+  const data=JSON.parse(raw);
+  document.getElementById('goalInput').value=data.goal||'';
+  starRating=data.stars||0;updateStars();
+  (data.memos||[]).forEach((dm,di)=>(dm||[]).forEach((m,li)=>{
+    const inp=document.getElementById(`mt_${di}_${li}`);
+    const cb=document.getElementById(`cb_${di}_${li}`);
+    if(inp){inp.value=m.text||'';if(m.checked)inp.classList.add('done');}
+    if(cb&&m.checked)cb.classList.add('checked');
+  }));
+  if(data.events){events=data.events;renderAllEvents();}
+  (data.hm||[]).forEach((v,i)=>{
+    const h=document.getElementById(`h_${i}`),m=document.getElementById(`m_${i}`);
+    if(h)h.value=v.h||'';if(m)m.value=v.m||'';
+  });
+}
+
+function updateWeekLabel(){
+  const end=new Date(currentWeekStart);end.setDate(end.getDate()+6);
+  document.getElementById('weekLabel').textContent=`${currentWeekStart.getMonth()+1}/${currentWeekStart.getDate()} — ${end.getMonth()+1}/${end.getDate()}`;
+}
+function changeWeek(dir){saveData();currentWeekStart=new Date(currentWeekStart);currentWeekStart.setDate(currentWeekStart.getDate()+dir*7);loadWeek();}
+function clearAll(){if(!confirm('이번 주 데이터를 모두 지울까요?'))return;localStorage.removeItem('plannerF_'+getWeekKey(currentWeekStart));loadWeek();}
+
+document.addEventListener('mouseup',()=>{if(isDragging)commitDrag();});
+document.addEventListener('input',e=>{if(e.target.matches('.goal-input,.memo-text,.hm-input'))saveData();});
+window.addEventListener('resize',()=>renderAllEvents());
+
+initStars();initPalette();
+requestAnimationFrame(()=>loadWeek());
+</script>
+</body>
+</html>
