@@ -215,7 +215,7 @@ function driveLogin(){
     callback: async (resp) => {
       if(resp.error){ setDriveStatus('error','로그인 실패: '+resp.error); return; }
       accessToken = resp.access_token;
-      localStorage.setItem('driveAccessToken', accessToken);
+      localStorage.setItem('driveConnected', '1');
       document.getElementById('driveLoginBtn').style.display='none';
       document.getElementById('driveSyncBtn').style.display='';
       document.getElementById('driveLogoutBtn').style.display='';
@@ -228,7 +228,7 @@ function driveLogin(){
 
 function driveLogout(){
   accessToken=null; driveFileId=null;
-  localStorage.removeItem('driveAccessToken');
+  localStorage.removeItem('driveConnected');
   document.getElementById('driveLoginBtn').style.display='';
   document.getElementById('driveSyncBtn').style.display='none';
   document.getElementById('driveLogoutBtn').style.display='none';
@@ -543,6 +543,30 @@ function renderBottom(){
   });
 }
 
+function autoReconnectDrive(){
+  if(!localStorage.getItem('driveConnected')) return;
+  setDriveStatus('syncing','Drive 자동 연결 중…');
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    ux_mode: 'popup',
+    callback: async (resp) => {
+      if(resp.error){
+        setDriveStatus('','Google Drive 미연결 — 로컬에만 저장됩니다');
+        localStorage.removeItem('driveConnected');
+        return;
+      }
+      accessToken = resp.access_token;
+      document.getElementById('driveLoginBtn').style.display='none';
+      document.getElementById('driveSyncBtn').style.display='';
+      document.getElementById('driveLogoutBtn').style.display='';
+      setDriveStatus('syncing','Drive 연결됨 — 데이터 불러오는 중…');
+      await drivePull();
+    }
+  });
+  client.requestAccessToken({prompt:''});
+}
+
 function initStars(){
   const stars=document.querySelectorAll('.star');
   stars.forEach(star=>{
@@ -613,7 +637,11 @@ document.addEventListener('input',e=>{if(e.target.matches('.goal-input,.memo-tex
 window.addEventListener('resize',()=>renderAllEvents());
 
 initStars();initPalette();
-requestAnimationFrame(()=>loadWeek());
+requestAnimationFrame(()=>{
+  loadWeek();
+  // Auto-reconnect Drive silently if previously connected
+  autoReconnectDrive();
+});
 </script>
 </body>
 </html>
